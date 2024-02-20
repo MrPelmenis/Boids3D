@@ -9,7 +9,13 @@ const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerH
 let cameraAngle = 0;
 let cube;
 
-let boid;
+
+let turningSpeedDivider = 1000;
+let transitionSpeed = 0.0001;
+let spreadSpeed = 0.1;
+let minDist = 1;
+
+let boids = [];
 
 function start(){
     var xAxis = new THREE.Line(
@@ -26,14 +32,9 @@ function start(){
     );
 
 
-    var geometry = new THREE.BoxGeometry(1, 1, 1);
-    var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    var cube = new THREE.Mesh(geometry, material);
+    var grid = new THREE.GridHelper(1000, 200);
+    scene.add(grid);
 
-    scene.add(cube);
-    cube.position.set(8,8,8);
-    
-    // Add axes to scene
     scene.add(xAxis);
     scene.add(yAxis);
     scene.add(zAxis);
@@ -42,13 +43,20 @@ function start(){
 
 
     const light = new THREE.DirectionalLight( 0xffffff, 1 );
-    light.position.set( 10, 20, 5 ); //default; light shining from top
-    light.castShadow = true; // default false
+    light.position.set( 0, 50, 0 );
+    light.castShadow = true;
+    light.intensity = 20;
     scene.add( light );
 
 
 
-    boid = new Boid(0, 0, 0, 0.01, 0.01, 0.01);
+
+   
+
+    for(let i = 0;i<2;i++){
+        boids.push(new Boid(0,0,0, Math.random()*0.01, Math.random()*0.01, Math.random()*0.01));
+    }
+
 
     animate();
 }
@@ -61,14 +69,21 @@ function start(){
 
 function animate() {
     renderer.setAnimationLoop(() => {
-        camera.position.x = Math.cos(cameraAngle) * 50;
-        camera.position.y = 8;
-        camera.position.z = Math.sin(cameraAngle) * 50;
-        cameraAngle += 0.001;
+        let myBoid = boids[0];
+        //camera follows my boid
+        camera.position.copy(myBoid.body.position);
+        camera.position.add(new THREE.Vector3(-5, 3, -5));
+        camera.lookAt(myBoid.body.position.x, myBoid.body.position.y, myBoid.body.position.z);
 
-        camera.lookAt(0, 0, 0);
 
-        boid.move();
+        //camera static
+        let dist = 20;
+        camera.position.set(-dist, 20, -dist);
+        camera.lookAt(0,0,0);
+
+        boids.forEach(boid =>{
+            boid.move();
+        })
 
         renderer.render(scene, camera);
     });
@@ -82,7 +97,7 @@ function animate() {
 
 class Boid{
     constructor(x, y, z, vX, vY, vZ){
-        const geometry = new THREE.BoxGeometry( 5, 1, 1 ); 
+        const geometry = new THREE.BoxGeometry( 2, 0.4, 0.4 ); 
         geometry.translate(2.5, 0, 0);
         const material = new THREE.MeshStandardMaterial( {color: 0x00ff00} ); 
         this.body = new THREE.Mesh( geometry, material ); 
@@ -102,6 +117,36 @@ class Boid{
 
 
     move(){
+
+        //alignment
+        {
+            let count = 0;
+        let tVX = 0;
+        let tVY = 0;
+        let tVZ = 0;
+        boids.forEach(boid =>{
+            if(boid.body.position.x != this.body.position.x || boid.body.position.z != this.body.position.z || boid.body.position.y != this.body.position.y ){
+                count++;
+                tVX += boid.vX;
+                tVY +=boid.vY;
+                tVZ += boid.vZ;
+            }
+        });
+
+        if(count != 0){
+            tVX /= count;
+            tVY /= count;
+            tVZ /= count;
+    
+            this.vX += (tVX - this.vX)/turningSpeedDivider;
+            this.vY += (tVY - this.vY)/turningSpeedDivider;
+            this.vZ += (tVZ - this.vZ)/turningSpeedDivider;
+        }
+        }
+
+        
+        
+        
         this.body.position.set(this.body.position.x + this.vX, this.body.position.y + this.vY, this.body.position.z + this.vZ);
         this.rotateToVelocity();
     }    
