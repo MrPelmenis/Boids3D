@@ -11,12 +11,9 @@ let cube;
 
 
 let turningSpeed = 0.0005;
-let minDistForAttraction = 100; 
-let minDistForSeparation = 50;
-let attractionCoefficient = 0.00001;
-let separationCoefficient = 0.00005;
-let maxSpeed = 0.001;
-let minDist = 0.5;
+let repulsionForceCof = 0.0015;
+let attractionForceCof = 0.0003;
+let distForRepulsion = 1;
 
 let boids = [];
 
@@ -56,7 +53,7 @@ function start(){
 
    
 
-    for(let i = 0;i<20;i++){
+    for(let i = 0;i<10;i++){
         boids.push(new Boid(Math.random()*2, 0, Math.random() *2, 0.1 + Math.random()*0.1,0,0.1 + Math.random()*0.1));
     }
 
@@ -101,11 +98,6 @@ function animate() {
 }
 
 
-
-
-
-
-
 class Boid{
     constructor(x, y, z, vX, vY, vZ){
         const geometry = new THREE.BoxGeometry( 1, 0.4, 0.4 ); 
@@ -130,7 +122,7 @@ class Boid{
     move(){
 
         //alignment
-        {
+        /*{
             let count = 0;
             let tVX = 0;
             let tVY = 0;
@@ -153,46 +145,45 @@ class Boid{
                 this.vY += (tVY - this.vY)*turningSpeed;
                 this.vZ += (tVZ - this.vZ)*turningSpeed;
             }
-        }
+        }*/
 
         //kustiba
-       {
+       
+            let repulsionForce = new THREE.Vector3(0,0,0);
+            let attractionForce = new THREE.Vector3(0,0,0);
             boids.forEach(boid => {
                 if (boid.body.position.x !== this.body.position.x || boid.body.position.z !== this.body.position.z || boid.body.position.y !== this.body.position.y) {
-                    let dist = Math.sqrt(Math.pow(boid.body.position.x - this.body.position.x, 2) + Math.pow(boid.body.position.y - this.body.position.y, 2) + Math.pow(boid.body.position.z - this.body.position.z, 2));
-                    let directionVector = new THREE.Vector3(boid.body.position.x - this.body.position.x, boid.body.position.y - this.body.position.y, boid.body.position.z - this.body.position.z);
-                    directionVector.normalize();
-            
-                    if (dist < minDistForAttraction) {
-                        let force = dist * attractionCoefficient;
-                        this.vX += directionVector.x * force;
-                        this.vY += directionVector.y * force;
-                        this.vZ += directionVector.z * force;
-                    }
-            
-                    if (dist < minDistForSeparation) {
-                        let separationDirection = directionVector.clone().negate();
-                        let force = separationCoefficient / (Math.pow(dist, 2));
-                        this.vX += separationDirection.x * force;
-                        this.vY += separationDirection.y * force;
-                        this.vZ += separationDirection.z * force;
+                    //not myself
+
+                    //repulsion
+                    if(boid.body.position.distanceTo(this.body.position) < distForRepulsion){
+                        let vec = new THREE.Vector3(boid.body.position.x - this.body.position.x, boid.body.position.y - this.body.position.y, boid.body.position.z - this.body.position.z);
+                        vec.negate();
+                        vec.divideScalar(vec.length());
+                        vec.multiplyScalar(repulsionForceCof);
+    
+                        repulsionForce.x = repulsionForce.x + vec.x;
+                        repulsionForce.y = repulsionForce.y + vec.y;
+                        repulsionForce.z = repulsionForce.z + vec.z;
                     }
                     
-                    /*console.log({
-                        x: this.vX,
-                        y: this.vY,
-                        z: this.vZ
-                    })*/
 
-                
+                    //attraction
+                    let vecA = new THREE.Vector3(boid.body.position.x - this.body.position.x, boid.body.position.y - this.body.position.y, boid.body.position.z - this.body.position.z);
+                    vecA.divideScalar(1/vecA.length());
+                    vecA.multiplyScalar(attractionForceCof);
 
-            }
-
-                
+                    attractionForce.x = attractionForce.x + vecA.x;
+                    attractionForce.y = attractionForce.y + vecA.y;
+                    attractionForce.z = attractionForce.z + vecA.z;           
+                }
             });
  
-        }
-           
+            this.vX += (attractionForce.x + repulsionForce.x);
+            this.vY += (attractionForce.y + repulsionForce.y);
+            this.vZ += (attractionForce.z + repulsionForce.z);
+
+            console.log(attractionForce.x / repulsionForce.x);
         
         
         this.body.position.set(this.body.position.x + this.vX, this.body.position.y + this.vY, this.body.position.z + this.vZ);
