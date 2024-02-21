@@ -10,10 +10,13 @@ let cameraAngle = 0;
 let cube;
 
 
-let turningSpeedDivider = 1000;
-let transitionSpeed = 0.0001;
-let spreadSpeed = 0.1;
-let minDist = 1;
+let turningSpeed = 0.0005;
+let minDistForAttraction = 100; 
+let minDistForSeparation = 50;
+let attractionCoefficient = 0.00001;
+let separationCoefficient = 0.00005;
+let maxSpeed = 0.001;
+let minDist = 0.5;
 
 let boids = [];
 
@@ -53,8 +56,8 @@ function start(){
 
    
 
-    for(let i = 0;i<2;i++){
-        boids.push(new Boid(0,0,0, Math.random()*0.01, Math.random()*0.01, Math.random()*0.01));
+    for(let i = 0;i<20;i++){
+        boids.push(new Boid(Math.random()*2, 0, Math.random() *2, 0.1 + Math.random()*0.1,0,0.1 + Math.random()*0.1));
     }
 
 
@@ -70,16 +73,24 @@ function start(){
 function animate() {
     renderer.setAnimationLoop(() => {
         let myBoid = boids[0];
-        //camera follows my boid
-        camera.position.copy(myBoid.body.position);
-        camera.position.add(new THREE.Vector3(-5, 3, -5));
-        camera.lookAt(myBoid.body.position.x, myBoid.body.position.y, myBoid.body.position.z);
+        let cameraOffset = new THREE.Vector3(-5, 3, -5); // Adjust these values as needed
+
+        // Calculate the camera position relative to the boid
+        let cameraPosition = myBoid.body.position.clone().add(cameraOffset);
+
+        // Set the camera position
+        camera.position.copy(cameraPosition);
+
+        // Set the camera's "lookAt" target to be the position of the boid
+        camera.lookAt(myBoid.body.position);
 
 
         //camera static
-        let dist = 20;
-        camera.position.set(-dist, 20, -dist);
+       /* let dist = 0;
+        camera.position.set(dist, 10, dist);
         camera.lookAt(0,0,0);
+        camera.lookAt(myBoid.body.position);
+*/
 
         boids.forEach(boid =>{
             boid.move();
@@ -97,7 +108,7 @@ function animate() {
 
 class Boid{
     constructor(x, y, z, vX, vY, vZ){
-        const geometry = new THREE.BoxGeometry( 2, 0.4, 0.4 ); 
+        const geometry = new THREE.BoxGeometry( 1, 0.4, 0.4 ); 
         geometry.translate(2.5, 0, 0);
         const material = new THREE.MeshStandardMaterial( {color: 0x00ff00} ); 
         this.body = new THREE.Mesh( geometry, material ); 
@@ -121,30 +132,67 @@ class Boid{
         //alignment
         {
             let count = 0;
-        let tVX = 0;
-        let tVY = 0;
-        let tVZ = 0;
-        boids.forEach(boid =>{
-            if(boid.body.position.x != this.body.position.x || boid.body.position.z != this.body.position.z || boid.body.position.y != this.body.position.y ){
-                count++;
-                tVX += boid.vX;
-                tVY +=boid.vY;
-                tVZ += boid.vZ;
-            }
-        });
+            let tVX = 0;
+            let tVY = 0;
+            let tVZ = 0;
+            boids.forEach(boid =>{
+                if(boid.body.position.x != this.body.position.x || boid.body.position.z != this.body.position.z || boid.body.position.y != this.body.position.y ){
+                    count++;
+                    tVX += boid.vX;
+                    tVY +=boid.vY;
+                    tVZ += boid.vZ;
+                }
+            });
 
-        if(count != 0){
-            tVX /= count;
-            tVY /= count;
-            tVZ /= count;
-    
-            this.vX += (tVX - this.vX)/turningSpeedDivider;
-            this.vY += (tVY - this.vY)/turningSpeedDivider;
-            this.vZ += (tVZ - this.vZ)/turningSpeedDivider;
-        }
-        }
-
+            if(count != 0){
+                tVX /= count;
+                tVY /= count;
+                tVZ /= count;
         
+                this.vX += (tVX - this.vX)*turningSpeed;
+                this.vY += (tVY - this.vY)*turningSpeed;
+                this.vZ += (tVZ - this.vZ)*turningSpeed;
+            }
+        }
+
+        //kustiba
+       {
+            boids.forEach(boid => {
+                if (boid.body.position.x !== this.body.position.x || boid.body.position.z !== this.body.position.z || boid.body.position.y !== this.body.position.y) {
+                    let dist = Math.sqrt(Math.pow(boid.body.position.x - this.body.position.x, 2) + Math.pow(boid.body.position.y - this.body.position.y, 2) + Math.pow(boid.body.position.z - this.body.position.z, 2));
+                    let directionVector = new THREE.Vector3(boid.body.position.x - this.body.position.x, boid.body.position.y - this.body.position.y, boid.body.position.z - this.body.position.z);
+                    directionVector.normalize();
+            
+                    if (dist < minDistForAttraction) {
+                        let force = dist * attractionCoefficient;
+                        this.vX += directionVector.x * force;
+                        this.vY += directionVector.y * force;
+                        this.vZ += directionVector.z * force;
+                    }
+            
+                    if (dist < minDistForSeparation) {
+                        let separationDirection = directionVector.clone().negate();
+                        let force = separationCoefficient / (Math.pow(dist, 2));
+                        this.vX += separationDirection.x * force;
+                        this.vY += separationDirection.y * force;
+                        this.vZ += separationDirection.z * force;
+                    }
+                    
+                    /*console.log({
+                        x: this.vX,
+                        y: this.vY,
+                        z: this.vZ
+                    })*/
+
+                
+
+            }
+
+                
+            });
+ 
+        }
+           
         
         
         this.body.position.set(this.body.position.x + this.vX, this.body.position.y + this.vY, this.body.position.z + this.vZ);
