@@ -11,9 +11,10 @@ let cube;
 
 
 let turningSpeed = 0.0005;
-let repulsionForceCof = 0.0015;
+let repulsionForceCof = 0.003;
 let attractionForceCof = 0.0003;
-let distForRepulsion = 1;
+let distForRepulsion = 0.5;
+let maxSpeed = 0.1;
 
 let boids = [];
 
@@ -53,33 +54,37 @@ function start(){
 
    
 
-    for(let i = 0;i<10;i++){
-        boids.push(new Boid(Math.random()*2, 0, Math.random() *2, 0.1 + Math.random()*0.1,0,0.1 + Math.random()*0.1));
+    for(let i = 0;i < 17;i++){
+        boids.push(new Boid(
+            i, i/5, 0,
+            0.1, -0.01, 0.1));
     }
 
-
-    animate();
+    setInterval(()=>{
+        animate();
+    }, 0.1);
 }
 
 
-
-
-
-
-
 function animate() {
-    renderer.setAnimationLoop(() => {
         let myBoid = boids[0];
-        let cameraOffset = new THREE.Vector3(-5, 3, -5); // Adjust these values as needed
 
-        // Calculate the camera position relative to the boid
-        let cameraPosition = myBoid.body.position.clone().add(cameraOffset);
+        let aX=0, aY=0, aZ=0;
+        boids.forEach(boid =>{
+            aX += boid.body.position.x;
+            aY += boid.body.position.y;
+            aZ += boid.body.position.z;
+        });
+        aX /= boids.length;
+        aY /= boids.length;
+        aZ /= boids.length;
 
-        // Set the camera position
+
+        let cameraOffset = new THREE.Vector3(-5, 3, -5); 
+
+        let cameraPosition = new THREE.Vector3(aX,aY,aZ).add(cameraOffset);
         camera.position.copy(cameraPosition);
-
-        // Set the camera's "lookAt" target to be the position of the boid
-        camera.lookAt(myBoid.body.position);
+        camera.lookAt(new THREE.Vector3(aX,aY,aZ));
 
 
         //camera static
@@ -91,10 +96,9 @@ function animate() {
 
         boids.forEach(boid =>{
             boid.move();
-        })
+        });
 
         renderer.render(scene, camera);
-    });
 }
 
 
@@ -122,7 +126,7 @@ class Boid{
     move(){
 
         //alignment
-        /*{
+        {
             let count = 0;
             let tVX = 0;
             let tVY = 0;
@@ -145,9 +149,9 @@ class Boid{
                 this.vY += (tVY - this.vY)*turningSpeed;
                 this.vZ += (tVZ - this.vZ)*turningSpeed;
             }
-        }*/
+        }
 
-        //kustiba
+            //kustiba
        
             let repulsionForce = new THREE.Vector3(0,0,0);
             let attractionForce = new THREE.Vector3(0,0,0);
@@ -159,8 +163,23 @@ class Boid{
                     if(boid.body.position.distanceTo(this.body.position) < distForRepulsion){
                         let vec = new THREE.Vector3(boid.body.position.x - this.body.position.x, boid.body.position.y - this.body.position.y, boid.body.position.z - this.body.position.z);
                         vec.negate();
-                        vec.divideScalar(vec.length());
-                        vec.multiplyScalar(repulsionForceCof);
+                        let length = vec.length();
+                        vec.normalize();
+                        let oppositeLength = 1 /(0.1);
+                        
+                        vec.multiplyScalar(oppositeLength * repulsionForceCof);
+    
+                        repulsionForce.x = repulsionForce.x + vec.x;
+                        repulsionForce.y = repulsionForce.y + vec.y;
+                        repulsionForce.z = repulsionForce.z + vec.z;
+                    }else{
+                        let vec = new THREE.Vector3(boid.body.position.x - this.body.position.x, boid.body.position.y - this.body.position.y, boid.body.position.z - this.body.position.z);
+                        vec.negate();
+                        let length = vec.length();
+                        vec.normalize();
+                        let oppositeLength = 1 /(0.4*(length+distForRepulsion));
+                        
+                        vec.multiplyScalar(oppositeLength * repulsionForceCof);
     
                         repulsionForce.x = repulsionForce.x + vec.x;
                         repulsionForce.y = repulsionForce.y + vec.y;
@@ -170,7 +189,6 @@ class Boid{
 
                     //attraction
                     let vecA = new THREE.Vector3(boid.body.position.x - this.body.position.x, boid.body.position.y - this.body.position.y, boid.body.position.z - this.body.position.z);
-                    vecA.divideScalar(1/vecA.length());
                     vecA.multiplyScalar(attractionForceCof);
 
                     attractionForce.x = attractionForce.x + vecA.x;
@@ -178,16 +196,21 @@ class Boid{
                     attractionForce.z = attractionForce.z + vecA.z;           
                 }
             });
- 
+
+            
+
             this.vX += (attractionForce.x + repulsionForce.x);
             this.vY += (attractionForce.y + repulsionForce.y);
             this.vZ += (attractionForce.z + repulsionForce.z);
-
-            console.log(attractionForce.x / repulsionForce.x);
+            let v = new THREE.Vector3((this.vX),(this.vY),(this.vZ));
+            if(v.length() > maxSpeed){
+                v.normalize();
+                v.multiplyScalar(maxSpeed);
+            }   
         
         
-        this.body.position.set(this.body.position.x + this.vX, this.body.position.y + this.vY, this.body.position.z + this.vZ);
-        this.rotateToVelocity();
+            this.body.position.set(this.body.position.x + v.x, this.body.position.y + v.y, this.body.position.z + v.z);
+            this.rotateToVelocity();
     }    
 
 
