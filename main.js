@@ -1,14 +1,12 @@
 const renderer = new THREE.WebGLRenderer();
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const scene = new THREE.Scene;
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
-let cameraAngle = 0;
-let cube;
 
+let boidAmount = 17;
+let wallLength = 30;
 
 let turningSpeed = 0.0005;
 let repulsionForceCof = 0.003;
@@ -16,48 +14,86 @@ let attractionForceCof = 0.0003;
 let distForRepulsion = 0.5;
 let maxSpeed = 0.1;
 
+const scene = new THREE.Scene;
+const camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 200);
+let cameraAngle = 0;
+let cube;
+
+
+
 let boids = [];
 
+let stepCountForMirroring = 0;
+
 function start(){
-    var xAxis = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-10, 0, 0), new THREE.Vector3(10, 0, 0)]),
-        new THREE.LineBasicMaterial({ color: 0xff0000 })
-    );
-    var yAxis = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -10, 0), new THREE.Vector3(0, 10, 0)]),
-        new THREE.LineBasicMaterial({ color: 0x00ff00 })
-    );
-    var zAxis = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, -10), new THREE.Vector3(0, 0, 10)]),
-        new THREE.LineBasicMaterial({ color: 0x0000ff })
-    );
+    let wallMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+    wallMaterial.castShadow = true;
+    wallMaterial.receiveShadow = true;
+    
+
+    let wallGeometryH = new THREE.BoxGeometry(wallLength, wallLength, 1);
+    let wall1 = new THREE.Mesh( wallGeometryH, wallMaterial ); 
+    wall1.position.set(0, 0, -wallLength/2);
+    scene.add(wall1);
+
+    let wallGeometryV = new THREE.BoxGeometry(1, wallLength, wallLength);
+    let wall2 = new THREE.Mesh( wallGeometryV, wallMaterial ); 
+    wall2.position.set(-wallLength/2, 0, 0);
+    scene.add(wall2);
+    
+
+    let wall3 = new THREE.Mesh( wallGeometryV, wallMaterial ); 
+    wall3.position.set(wallLength/2, 0, 0);
+    scene.add(wall3);
+
+    let wall4 = new THREE.Mesh( wallGeometryH, wallMaterial ); 
+    wall4.position.set(0, 0, wallLength/2);
+    scene.add(wall4);
 
 
-    var grid = new THREE.GridHelper(1000, 200);
-    scene.add(grid);
+    let wallGeometryF = new THREE.BoxGeometry(wallLength, 1, wallLength);
+    let wall5 = new THREE.Mesh( wallGeometryF, wallMaterial ); 
+    wall5.position.set(0, -wallLength/2, 0);
+    scene.add(wall5);
 
-    scene.add(xAxis);
-    scene.add(yAxis);
-    scene.add(zAxis);
+    let wall6 = new THREE.Mesh( wallGeometryF, wallMaterial ); 
+    wall6.position.set(0, wallLength/2, 0);
+    scene.add(wall6);
+    
 
 
+    let target = new THREE.Object3D();
+    target.position.set( -6, -wallLength / 2,-6);
+    let directionalLight = new THREE.DirectionalLight(0xffffff);
+    directionalLight.position.set(0, wallLength/2,0); 
+    directionalLight.target = target;
+    directionalLight.castShadow = true;
+    directionalLight.intensity = 2;
 
 
-    const light = new THREE.DirectionalLight( 0xffffff, 1 );
-    light.position.set( 0, 50, 0 );
-    light.castShadow = true;
-    light.intensity = 20;
-    scene.add( light );
+    directionalLight.shadow.camera.left = -wallLength / 2 - 1; // Set left boundary
+    directionalLight.shadow.camera.right = wallLength / 2 + 1; // Set right boundary
+    directionalLight.shadow.camera.top = wallLength / 2 + 1; // Set top boundary
+    directionalLight.shadow.camera.bottom = -wallLength / 2 -1; // Set bottom boundary
 
+    scene.add(directionalLight);
+    scene.add(target);
+
+    let cubeMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    let cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+    let cube = new THREE.Mesh(cubeGeo, cubeMat);
+    cube.position.set(directionalLight.position.x, directionalLight.position.y, directionalLight.position.z);
+
+    scene.add(cube);
 
 
 
    
-
-    for(let i = 0;i < 17;i++){
+   
+    for(let i = 0;i < boidAmount;i++){
         boids.push(new Boid(
-            i, i/5, 0,
-            0.1, -0.01, 0.1));
+           Math.random() * boidAmount - boidAmount / 2, Math.random() * boidAmount - boidAmount / 2, Math.random() * boidAmount - boidAmount / 2,
+            Math.random()* 0.1, Math.random()* 0.1, Math.random()* 0.1));
     }
 
     setInterval(()=>{
@@ -84,15 +120,38 @@ function animate() {
 
         let cameraPosition = new THREE.Vector3(aX,aY,aZ).add(cameraOffset);
         camera.position.copy(cameraPosition);
-        camera.lookAt(new THREE.Vector3(aX,aY,aZ));
-
-
+        camera.lookAt(new THREE.Vector3(aX, aY, aZ));
+            
         //camera static
-       /* let dist = 0;
-        camera.position.set(dist, 10, dist);
-        camera.lookAt(0,0,0);
-        camera.lookAt(myBoid.body.position);
-*/
+
+        stepCountForMirroring++;
+        if(stepCountForMirroring > 1000){
+            stepCountForMirroring = 0;
+            boids.forEach(boid =>{
+                if(boid.body.position.x > wallLength / 2){
+                    boid.body.position.x = -boid.body.position.x;
+                }
+                
+                if(boid.body.position.y > wallLength / 2){
+                    boid.body.position.y = -boid.body.position.y;
+                }
+
+                if(boid.body.position.x < -wallLength / 2){
+                    boid.body.position.x = -boid.body.position.x;
+                }
+                
+                if(boid.body.position.y < -wallLength / 2){
+                    boid.body.position.y = -boid.body.position.y;
+                }
+            });
+        }
+
+        let dist = 20;
+        camera.position.set(wallLength/2 - 1, 0, wallLength/2-1);
+
+        //camera.position.set(40, 20 ,40)
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        camera.lookAt(new THREE.Vector3(aX, aY, aZ));
 
         boids.forEach(boid =>{
             boid.move();
@@ -106,8 +165,11 @@ class Boid{
     constructor(x, y, z, vX, vY, vZ){
         const geometry = new THREE.BoxGeometry( 1, 0.4, 0.4 ); 
         geometry.translate(2.5, 0, 0);
-        const material = new THREE.MeshStandardMaterial( {color: 0x00ff00} ); 
+        const material = new THREE.MeshStandardMaterial( {color: 0x00bb00} ); 
+        material.castShadow  = true;
+        material.receiveShadow = true;
         this.body = new THREE.Mesh( geometry, material ); 
+        
         this.body.position.set(x,y,z);
 
         this.vX = vX;
