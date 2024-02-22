@@ -5,14 +5,14 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 
-let boidAmount = 17;
-let wallLength = 30;
+let boidAmount = 10;
+let wallLength = 50;
 
 let turningSpeed = 0.0005;
 let repulsionForceCof = 0.003;
-let attractionForceCof = 0.0003;
+let attractionForceCof = 0.00005;
 let distForRepulsion = 0.5;
-let maxSpeed = 0.1;
+let maxSpeed = 0.5;
 
 const scene = new THREE.Scene;
 const camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -92,7 +92,7 @@ function start(){
    
     for(let i = 0;i < boidAmount;i++){
         boids.push(new Boid(
-           Math.random() * boidAmount - boidAmount / 2, Math.random() * boidAmount - boidAmount / 2, Math.random() * boidAmount - boidAmount / 2,
+           Math.random() * wallLength - wallLength / 2, Math.random() * wallLength - wallLength / 2, Math.random() * wallLength - wallLength / 2,
             Math.random()* 0.1, Math.random()* 0.1, Math.random()* 0.1));
     }
 
@@ -124,27 +124,44 @@ function animate() {
             
         //camera static
 
-        stepCountForMirroring++;
-        if(stepCountForMirroring > 1000){
-            stepCountForMirroring = 0;
-            boids.forEach(boid =>{
-                if(boid.body.position.x > wallLength / 2){
-                    boid.body.position.x = -boid.body.position.x;
-                }
-                
-                if(boid.body.position.y > wallLength / 2){
-                    boid.body.position.y = -boid.body.position.y;
-                }
+        boids.forEach(boid =>{
+            if(boid.body.position.x > wallLength / 2 - 2){
+                boid.vX *= -1;
+                boid.body.position.x -= 1;
+                return;
+            }
+            
+            if(boid.body.position.y > wallLength / 2 - 2){
+                boid.vY *= -1;
+                boid.body.position.y -= 1;
+                return;
+            }
 
-                if(boid.body.position.x < -wallLength / 2){
-                    boid.body.position.x = -boid.body.position.x;
-                }
-                
-                if(boid.body.position.y < -wallLength / 2){
-                    boid.body.position.y = -boid.body.position.y;
-                }
-            });
-        }
+            if(boid.body.position.z > wallLength / 2 - 2){
+                boid.vZ *= -1;
+                boid.body.position.z -= 1;
+                return;
+            }
+
+            if(boid.body.position.x < -wallLength / 2 + 2){
+                boid.vX *= -1;
+                boid.body.position.x += 1;
+                return;
+            }
+            
+            if(boid.body.position.y < -wallLength / 2 + 2){
+                boid.vY *= -1;
+                boid.body.position.y += 1;
+                return;
+            }
+
+
+            if(boid.body.position.z < -wallLength / 2 + 2){
+                boid.vZ *= -1;
+                boid.body.position.z += 1;
+                return;
+            }
+        });
 
         let dist = 20;
         camera.position.set(wallLength/2 - 1, 0, wallLength/2-1);
@@ -163,7 +180,7 @@ function animate() {
 
 class Boid{
     constructor(x, y, z, vX, vY, vZ){
-        const geometry = new THREE.BoxGeometry( 1, 0.4, 0.4 ); 
+        const geometry = new THREE.BoxGeometry(2, 0.8, 0.8 ); 
         geometry.translate(2.5, 0, 0);
         const material = new THREE.MeshStandardMaterial( {color: 0x00bb00} ); 
         material.castShadow  = true;
